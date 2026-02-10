@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<title>크리스의 음MAD 제작기 + ZIP 다운로드 🎵</title>
+<title>AI 음MAD 제작기 + ZIP 다운로드 🎵</title>
 <style>
   body {
     font-family: 'Segoe UI', sans-serif;
@@ -22,7 +22,14 @@
     font-size: 2rem;
   }
 
-  input, button { margin: 5px; padding: 10px 20px; border:none; border-radius:8px; cursor:pointer; }
+  input, button {
+    margin: 5px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
   button:hover { background-color: rgba(255,255,255,1); }
   audio { margin-top: 15px; width: 100%; max-width: 600px; }
 
@@ -38,19 +45,21 @@
 <div class="container">
   <h1>AI 음MAD 제작기 🎵</h1>
 
+  <!-- 1️⃣ 음악 업로드 -->
   <label>원본 음악 업로드:
     <input type="file" id="musicInput" accept="audio/*">
   </label>
-
   <br>
+
+  <!-- 2️⃣ 목소리 녹음 -->
   <button id="startRec">🎙 녹음 시작</button>
   <button id="stopRec">⏹ 녹음 종료</button>
   <audio id="voicePreview" controls></audio>
-
   <br>
+
+  <!-- 3️⃣ 음MAD 제작 + ZIP -->
   <button id="makeMad">🎶 음MAD 제작</button>
   <button id="downloadZip">💾 ZIP 다운로드</button>
-
   <br><br>
   <audio id="finalMad" controls></audio>
 </div>
@@ -99,19 +108,19 @@ document.getElementById('makeMad').onclick = async () => {
     const fileInput = document.getElementById('musicInput').files[0];
     if (!fileInput) { alert("원본 음악 업로드 필요!"); return; }
 
+    // AudioContext resume
+    if (audioContext.state === 'suspended') await audioContext.resume();
+
     const arrayBuffer = await fileInput.arrayBuffer();
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
     const bpm = await detectBPM(audioBuffer);
     alert("감지된 BPM: " + bpm);
 
-    // 현재는 단순 재생용
-    const source = audioContext.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(audioContext.destination);
-    source.start();
-
+    // HTMLAudioElement로 재생 (브라우저 호환성)
     finalBlob = new Blob([arrayBuffer], {type: fileInput.type});
-    document.getElementById('finalMad').src = URL.createObjectURL(finalBlob);
+    const finalAudio = document.getElementById('finalMad');
+    finalAudio.src = URL.createObjectURL(finalBlob);
+    finalAudio.play();
 };
 
 // --- ZIP 다운로드 ---
