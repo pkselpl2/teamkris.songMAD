@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>크리스의 음MAD 제작기 + ZIP 다운로드 🎵</title>
+<style>
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    margin: 0;
+    padding: 30px;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #00cc00, #ffff66);
+    color: #111;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  h1 {
+    margin-bottom: 30px;
+    text-align: center;
+    font-size: 2rem;
+  }
+
+  input, button { margin: 5px; padding: 10px 20px; border:none; border-radius:8px; cursor:pointer; }
+  button:hover { background-color: rgba(255,255,255,1); }
+  audio { margin-top: 15px; width: 100%; max-width: 600px; }
+
+  .container {
+    width: 90%; max-width: 700px;
+    background: rgba(255,255,255,0.1); padding: 20px 30px; border-radius: 15px;
+    backdrop-filter: blur(10px);
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>AI 음MAD 제작기 🎵</h1>
+
+  <label>원본 음악 업로드:
+    <input type="file" id="musicInput" accept="audio/*">
+  </label>
+
+  <br>
+  <button id="startRec">🎙 녹음 시작</button>
+  <button id="stopRec">⏹ 녹음 종료</button>
+  <audio id="voicePreview" controls></audio>
+
+  <br>
+  <button id="makeMad">🎶 음MAD 제작</button>
+  <button id="downloadZip">💾 ZIP 다운로드</button>
+
+  <br><br>
+  <audio id="finalMad" controls></audio>
+</div>
+
+<!-- JSZip CDN -->
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+<script>
+let audioContext = new (window.AudioContext || window.webkitAudioContext)();
+let recordedChunks = [];
+let mediaRecorder;
+let voiceBlob;
+let finalBlob;
+
+// --- 목소리 녹음 ---
+document.getElementById('startRec').onclick = async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+    recordedChunks = [];
+    mediaRecorder.ondataavailable = e => recordedChunks.push(e.data);
+    mediaRecorder.onstop = () => {
+        voiceBlob = new Blob(recordedChunks, { type: 'audio/wav' });
+        document.getElementById('voicePreview').src = URL.createObjectURL(voiceBlob);
+    };
+    mediaRecorder.start();
+};
+
+document.getElementById('stopRec').onclick = () => mediaRecorder.stop();
+
+// --- BPM 감지 (간단) ---
+async function detectBPM(audioBuffer) {
+    const data = audioBuffer.getChannelData(0);
+    let peaks = [];
+    const threshold = 0.9 * Math.max(...data);
+    for (let i = 0; i < data.length; i++) if (data[i] > threshold) peaks.push(i);
+    if (peaks.length < 2) return 120;
+    const intervals = [];
+    for (let i = 1; i < peaks.length; i++) intervals.push(peaks[i] - peaks[i-1]);
+    const avgInterval = intervals.reduce((a,b)=>a+b)/intervals.length;
+    const bpm = 60 / (avgInterval / audioBuffer.sampleRate);
+    return Math.round(bpm);
+}
+
+// --- 음MAD 제작 ---
+document.getElementById('makeMad').onclick = async () => {
+    const fileInput = document.getElementById('musicInput').files[0];
+    if (!fileInput) { alert("원본 음악 업로드 필요!"); return; }
+
+    const arrayBuffer = await fileInput.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    const bpm = await detectBPM(audioBuffer);
+    alert("감지된 BPM: " + bpm);
+
+    // 현재는 단순 재생용
+    const source = audioContext.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(audioContext.destination);
+    source.start();
+
+    finalBlob = new Blob([arrayBuffer], {type: fileInput.type});
+    document.getElementById('finalMad').src = URL.createObjectURL(finalBlob);
+};
+
+// --- ZIP 다운로드 ---
+document.getElementById('downloadZip').onclick = async () => {
+    if (!finalBlob && !voiceBlob) { alert("음악이나 녹음이 없습니다!"); return; }
+    const zip = new JSZip();
+    if (finalBlob) zip.file("music.wav", finalBlob);
+    if (voiceBlob) zip.file("voice.wav", voiceBlob);
+    const content = await zip.generateAsync({ type: "blob" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(content);
+    a.download = "ai_mad.zip";
+    a.click();
+};
+</script>
+
+</body>
+</html>
